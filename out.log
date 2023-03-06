@@ -1,2 +1,0 @@
-[03/Mar/2023 23:50:54] ERROR [TimeHandler]: Exception: 'str' object has no attribute 'hour'
-NoneType: None
