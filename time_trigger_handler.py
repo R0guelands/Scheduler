@@ -8,6 +8,7 @@ import json
 import time
 import logging
 import sys
+import math
 
 # def except_handler(type, value, tb):
 #     logger.exception("Exception: {0}".format(str(value)))
@@ -29,6 +30,13 @@ dependecy_trygger = db.dependecy_triggers
 
 task_table = pd.DataFrame(columns=["Name", "Time"])
 
+def seconds_between_now_and_datetime(dt):
+    tz = pytz.timezone('America/Sao_Paulo')
+    now = datetime.datetime.now(tz)
+    dt_brtz = dt.astimezone(tz)
+    timedelta = dt_brtz - now
+    return math.ceil(timedelta.total_seconds())
+
 
 def get_next_sixth_hours(num_hours=24):
     tz_brazil = pytz.timezone("America/Sao_Paulo")
@@ -49,8 +57,8 @@ def get_next_sixth_hours(num_hours=24):
 def run():
     tasks = list(time_trigger.find({}))
     max_time_table = get_next_sixth_hours()
-    task_table = pd.DataFrame(columns=["Name", "Time"])
-    task_table.loc[0] = ["DB_Request", max_time_table.loc[0, "Datetime"]]
+    task_table = pd.DataFrame(columns=["Name", "Time", "Seconds"])
+    task_table.loc[0] = ["DB_Request", max_time_table.loc[0, "Datetime"], seconds_between_now_and_datetime(max_time_table.loc[0, "Datetime"])]
     for task in tasks:
         if "daily" in task["config"]:
             if len(task["config"]["daily"]) == 0:
@@ -64,7 +72,7 @@ def run():
                     hour=hour.hour, minute=hour.minute, second=0, microsecond=0
                 )
                 if hour_ >= now and hour_ <= max_time_table.loc[0, "Datetime"]:
-                    task_table.loc[len(task_table)] = [task["name"], hour_]
+                    task_table.loc[len(task_table)] = [task["name"], hour_, seconds_between_now_and_datetime(hour_)]
 
         if "weekly" in task["config"]:
             if len(task["config"]["weekly"]) == 0:
@@ -82,7 +90,7 @@ def run():
                             hour=hour.hour, minute=hour.minute, second=0, microsecond=0
                         )
                         if hour_ >= now and hour_ <= max_time_table.loc[0, "Datetime"]:
-                            task_table.loc[len(task_table)] = [task["name"], hour_]
+                            task_table.loc[len(task_table)] = [task["name"], hour_, seconds_between_now_and_datetime(hour_)]
 
         if "monthly" in task["config"]:
             if len(task["config"]["monthly"]) == 0:
@@ -100,7 +108,7 @@ def run():
                             hour=hour.hour, minute=hour.minute, second=0, microsecond=0
                         )
                         if hour_ >= now and hour_ <= max_time_table.loc[0, "Datetime"]:
-                            task_table.loc[len(task_table)] = [task["name"], hour_]
+                            task_table.loc[len(task_table)] = [task["name"], hour_, seconds_between_now_and_datetime(hour_)]
 
     groups = task_table.groupby("Time").filter(lambda x: len(x) > 1).groupby("Time")
     task_table_list = [group.reset_index(drop=True) for _, group in groups]
