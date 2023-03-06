@@ -9,6 +9,10 @@ import time
 import logging
 import sys
 import math
+import threading
+import subprocess
+import shutil
+
 
 # def except_handler(type, value, tb):
 #     logger.exception("Exception: {0}".format(str(value)))
@@ -26,6 +30,7 @@ project = db.projects
 http_trigger = db.http_triggers
 time_trigger = db.time_triggers
 dependecy_trygger = db.dependecy_triggers
+execution_history = db.execution_history
 
 
 task_table = pd.DataFrame(columns=["Name", "Time"])
@@ -53,12 +58,44 @@ def get_next_sixth_hours(num_hours=24):
 
     return pd.DataFrame({"Datetime": next_sixth_hours})
 
+def copy_log(task_name, log_path, timestamp):
+    if os.path.exists(log_path):
+        if not os.path.exists(f"./logs/{task_name}"):
+            os.makedirs(f"./logs/{task_name}")
+        shutil.copy(log_path, f"./logs/{task_name}/{timestamp}.log")
 
-def run():
+def add_execution_history(task_name, task_type, status, start_time, end_time, log_path):
+    execution_history.insert_one({
+        "name": task_name,
+        "task_type": task_type,
+        "status": status,
+        "start_time": start_time.isoformat(),
+        "end_time": end_time.isoformat(),
+        "runtime": (end_time - start_time).total_seconds(),
+        "log_path": log_path
+    })
+
+def run_task(task_name):
+    project_info = project.find_one({"name": task_name})
+    if project_info["status"] != "time" or not project_info["status"]:
+        return
+    venv_python = project_info["python_path"]
+    args = [venv_python, project_info["exec_path"]]
+    start_time = datetime.datetime.now(tz=pytz.timezone('America/Sao_Paulo'))
+    execution = subprocess.run(args)  
+    end_time = datetime.datetime.now(tz=pytz.timezone('America/Sao_Paulo'))
+    copy_log(task_name, project_info["log_path"], start_time.strftime('%Y-%m-%d_%H-%M-%S'))
+    execution_returncode = "Success" if execution.returncode == 0 else "Failed"
+    add_execution_history(task_name, "time", execution_returncode, start_time, end_time, f"./logs/{task_name}/{start_time.strftime('%Y-%m-%d_%H-%M-%S')}.log")
+
+    
+
+
+def get_exec_table():
     tasks = list(time_trigger.find({}))
     max_time_table = get_next_sixth_hours()
-    task_table = pd.DataFrame(columns=["Name", "Time", "Seconds"])
-    task_table.loc[0] = ["DB_Request", max_time_table.loc[0, "Datetime"], seconds_between_now_and_datetime(max_time_table.loc[0, "Datetime"])]
+    task_table = pd.DataFrame(columns=["Name", "Time"])
+    task_table.loc[0] = ["DB_Request", max_time_table.loc[0, "Datetime"]]
     for task in tasks:
         if "daily" in task["config"]:
             if len(task["config"]["daily"]) == 0:
@@ -72,7 +109,7 @@ def run():
                     hour=hour.hour, minute=hour.minute, second=0, microsecond=0
                 )
                 if hour_ >= now and hour_ <= max_time_table.loc[0, "Datetime"]:
-                    task_table.loc[len(task_table)] = [task["name"], hour_, seconds_between_now_and_datetime(hour_)]
+                    task_table.loc[len(task_table)] = [task["name"], hour_]
 
         if "weekly" in task["config"]:
             if len(task["config"]["weekly"]) == 0:
@@ -90,7 +127,7 @@ def run():
                             hour=hour.hour, minute=hour.minute, second=0, microsecond=0
                         )
                         if hour_ >= now and hour_ <= max_time_table.loc[0, "Datetime"]:
-                            task_table.loc[len(task_table)] = [task["name"], hour_, seconds_between_now_and_datetime(hour_)]
+                            task_table.loc[len(task_table)] = [task["name"], hour_]
 
         if "monthly" in task["config"]:
             if len(task["config"]["monthly"]) == 0:
@@ -108,7 +145,7 @@ def run():
                             hour=hour.hour, minute=hour.minute, second=0, microsecond=0
                         )
                         if hour_ >= now and hour_ <= max_time_table.loc[0, "Datetime"]:
-                            task_table.loc[len(task_table)] = [task["name"], hour_, seconds_between_now_and_datetime(hour_)]
+                            task_table.loc[len(task_table)] = [task["name"], hour_]
 
     groups = task_table.groupby("Time").filter(lambda x: len(x) > 1).groupby("Time")
     task_table_list = [group.reset_index(drop=True) for _, group in groups]
@@ -118,7 +155,23 @@ def run():
     )
     task_table_list.sort(key=lambda x: x["Time"].iloc[0])
 
-    for task_table in task_table_list:
-        print(task_table)
+    return task_table_list
 
-run()
+
+
+
+while True:
+    task_table_list = get_exec_table()
+    for task_table in task_table_list:
+        sleep_time = seconds_between_now_and_datetime(task_table.loc[0, "Time"])
+        print(f"Sleeping for {sleep_time} seconds")
+        time.sleep(sleep_time)
+        threds = []
+        for task in task_table["Name"]:
+            print(f"Running task {task}")
+            if task != "DB_Request":
+                thread = threading.Thread(target=run_task, args=(task,))
+                thread.start()
+                threds.append(thread)
+        for thread in threds:
+            thread.join()

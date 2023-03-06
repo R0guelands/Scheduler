@@ -28,6 +28,7 @@ project = db.projects
 http_trigger = db.http_triggers
 time_trigger = db.time_triggers
 dependecy_trygger = db.dependecy_triggers
+execution_history = db.execution_history
 
 
 def check_project(folder):
@@ -59,7 +60,7 @@ def check_valids_on_db(projects_local):
                     "name": name,
                     "status": "no_schedule",
                     "exec_path": f"./projects/{name}/main.py",
-                    "log_path": f"./projects/{name}/logs",
+                    "log_path": f"./projects/{name}/out.log",
                     "python_path": f"./projects/{name}/.venv/bin/python",
                     "created_at": f"{dt.datetime.now(tz=pytz.timezone('America/Sao_Paulo')).strftime('%Y-%m-%d %H:%M:%S')}",
                 }
@@ -82,6 +83,8 @@ def scan_projects():
 def get_projects():
     return list(project.find({}))
 
+def get_execution_history():
+    return list(execution_history.find({}))
 
 def get_http_triggers():
     return list(http_trigger.find({}))

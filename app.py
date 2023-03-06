@@ -24,7 +24,8 @@ def index():
 
 @app.route("/history", methods=["GET"])
 def history():
-    return render_template("history.html")
+    execution_history = helper.get_execution_history()
+    return render_template("history.html", execution_history=execution_history)
 
 
 @app.route("/edit/<project_name>", methods=["GET"])
