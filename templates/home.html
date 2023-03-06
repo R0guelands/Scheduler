@@ -47,13 +47,10 @@
                                         Name
                                     </th>
                                     <th scope="col" class="px-6 py-3">
-                                        Main Path
-                                    </th>
-                                    <th scope="col" class="px-6 py-3">
                                         Status
                                     </th>
                                     <th scope="col" class="px-6 py-3">
-                                        Log Path
+                                        Exec Path
                                     </th>
                                     <th scope="col" class="px-6 py-3">
                                         Action
@@ -68,17 +65,19 @@
                                             {{project.name}}
                                         </th>
                                         <td class="px-6 py-4">
-                                            {{project.path}}
-                                        </td>
-                                        <td class="px-6 py-4">
                                             {{project.status}}
                                         </td>
                                         <td class="px-6 py-4">
-                                            {{project.log_path}}
+                                            {{project.exec_path}}
                                         </td>
                                         <td class="px-6 py-4">
-                                            <a href="/edit"
-                                                class="font-medium text-blue-600 dark:text-blue-500 hover:underline">Edit</a>
+                                            {% if project.status == 'no_schedule' %}
+                                                <a href="/edit/{{project.name}}"
+                                                    class="font-medium text-blue-600 dark:text-blue-500 hover:underline">Edit</a>
+                                            {% else %}
+                                                <a href="/deleteTrigger/{{project.status}}/{{project.name}}"
+                                                    class="font-medium text-blue-600 dark:text-blue-500 hover:underline">RM Trigger</a>
+                                            {% endif %}
                                         </td>
                                     </tr>
                                 {% endfor %}
@@ -95,61 +94,25 @@
                                 class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                                 <tr>
                                     <th scope="col" class="px-6 py-3">
-                                        Product name
+                                        Name
                                     </th>
                                     <th scope="col" class="px-6 py-3">
-                                        Color
-                                    </th>
-                                    <th scope="col" class="px-6 py-3">
-                                        Category
-                                    </th>
-                                    <th scope="col" class="px-6 py-3">
-                                        Price
-                                    </th>
-                                    <th scope="col" class="px-6 py-3">
-                                        Action
+                                        Created At
                                     </th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr class="bg-white border-b dark:bg-gray-900 dark:border-gray-700">
-                                    <th scope="row"
-                                        class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
-                                        Apple MacBook Pro 17"
-                                    </th>
-                                    <td class="px-6 py-4">
-                                        Silver
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        Laptop
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        $2999
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <a href="#"
-                                            class="font-medium text-blue-600 dark:text-blue-500 hover:underline">Edit</a>
-                                    </td>
-                                </tr>
-                                <tr class="border-b bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
-                                    <th scope="row"
-                                        class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
-                                        Microsoft Surface Pro
-                                    </th>
-                                    <td class="px-6 py-4">
-                                        White
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        Laptop PC
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        $1999
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <a href="#"
-                                            class="font-medium text-blue-600 dark:text-blue-500 hover:underline">Edit</a>
-                                    </td>
-                                </tr>
+                                {% for http in http_triggers %}
+                                    <tr class="bg-white border-b dark:bg-gray-900 dark:border-gray-700">
+                                        <th scope="row"
+                                            class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                                            {{http.name}}
+                                        </th>
+                                        <td class="px-6 py-4">
+                                            {{http.created_at}}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
                             </tbody>
                         </table>
                     </div>
@@ -159,61 +122,31 @@
                                 class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                                 <tr>
                                     <th scope="col" class="px-6 py-3">
-                                        Product name
+                                        Name
                                     </th>
                                     <th scope="col" class="px-6 py-3">
-                                        Color
+                                        Created At
                                     </th>
                                     <th scope="col" class="px-6 py-3">
-                                        Category
-                                    </th>
-                                    <th scope="col" class="px-6 py-3">
-                                        Price
-                                    </th>
-                                    <th scope="col" class="px-6 py-3">
-                                        Action
+                                        Config
                                     </th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr class="bg-white border-b dark:bg-gray-900 dark:border-gray-700">
-                                    <th scope="row"
-                                        class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
-                                        Apple MacBook Pro 17"
-                                    </th>
-                                    <td class="px-6 py-4">
-                                        Silver
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        Laptop
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        $2999
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <a href="#"
-                                            class="font-medium text-blue-600 dark:text-blue-500 hover:underline">Edit</a>
-                                    </td>
-                                </tr>
-                                <tr class="border-b bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
-                                    <th scope="row"
-                                        class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
-                                        Microsoft Surface Pro
-                                    </th>
-                                    <td class="px-6 py-4">
-                                        White
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        Laptop PC
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        $1999
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <a href="#"
-                                            class="font-medium text-blue-600 dark:text-blue-500 hover:underline">Edit</a>
-                                    </td>
-                                </tr>
+                                {% for time in time_triggers %}
+                                    <tr class="bg-white border-b dark:bg-gray-900 dark:border-gray-700">
+                                        <th scope="row"
+                                            class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                                            {{time.name}}
+                                        </th>
+                                        <td class="px-6 py-4">
+                                            {{time.created_at}}
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            {{time.config}}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
                             </tbody>
                         </table>
                     </div>
@@ -223,61 +156,37 @@
                                 class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                                 <tr>
                                     <th scope="col" class="px-6 py-3">
-                                        Product name
+                                        Name
                                     </th>
                                     <th scope="col" class="px-6 py-3">
-                                        Color
+                                        Created At
                                     </th>
                                     <th scope="col" class="px-6 py-3">
-                                        Category
+                                        Parent
                                     </th>
                                     <th scope="col" class="px-6 py-3">
-                                        Price
-                                    </th>
-                                    <th scope="col" class="px-6 py-3">
-                                        Action
+                                        Type
                                     </th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr class="bg-white border-b dark:bg-gray-900 dark:border-gray-700">
-                                    <th scope="row"
-                                        class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
-                                        Apple MacBook Pro 17"
-                                    </th>
-                                    <td class="px-6 py-4">
-                                        Silver
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        Laptop
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        $2999
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <a href="#"
-                                            class="font-medium text-blue-600 dark:text-blue-500 hover:underline">Edit</a>
-                                    </td>
-                                </tr>
-                                <tr class="border-b bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
-                                    <th scope="row"
-                                        class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
-                                        Microsoft Surface Pro
-                                    </th>
-                                    <td class="px-6 py-4">
-                                        White
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        Laptop PC
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        $1999
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <a href="#"
-                                            class="font-medium text-blue-600 dark:text-blue-500 hover:underline">Edit</a>
-                                    </td>
-                                </tr>
+                                {% for dependency in dependency_triggers %}
+                                    <tr class="bg-white border-b dark:bg-gray-900 dark:border-gray-700">
+                                        <th scope="row"
+                                            class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                                            {{dependency.name}}
+                                        </th>
+                                        <td class="px-6 py-4">
+                                            {{dependency.created_at}}
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            {{dependency.parent}}
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            {{dependency.trigger_type}}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
                             </tbody>
                         </table>
                     </div>
