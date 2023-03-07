@@ -4,23 +4,31 @@ from dotenv import load_dotenv
 import pandas as pd
 import datetime
 import pytz
-import json
 import time
-import logging
-import sys
 import math
 import threading
 import subprocess
 import shutil
+import logging
+import sys
 
+if not os.path.exists("./logs/time_scheduler"):
+    os.makedirs("./logs/time_scheduler")
 
-# def except_handler(type, value, tb):
-#     logger.exception("Exception: {0}".format(str(value)))
+def except_handler(type, value, tb):
+    logger.exception("Exception: {0}".format(str(value)))
 
-# logging.basicConfig(filename="out.log", filemode="w", format="[%(asctime)s] %(levelname)s [%(name)s]: %(message)s", datefmt="%d/%b/%Y %H:%M:%S",)
-# logger = logging.getLogger("TimeHandler")
-# logger.setLevel(logging.INFO)
-# sys.excepthook = except_handler
+def timetz(*args):
+    return datetime.datetime.now(tz).timetuple()
+
+tz = pytz.timezone('America/Sao_Paulo')
+
+logging.Formatter.converter = timetz
+
+logging.basicConfig(filename="./logs/time_scheduler/out.log", format="[%(asctime)s] %(levelname)s [%(name)s]: %(message)s", datefmt="%d/%b/%Y %H:%M:%S",)
+logger = logging.getLogger("Time Scheduler")
+logger.setLevel(logging.INFO)
+sys.excepthook = except_handler
 
 load_dotenv()
 
@@ -35,8 +43,9 @@ execution_history = db.execution_history
 
 task_table = pd.DataFrame(columns=["Name", "Time"])
 
+
 def seconds_between_now_and_datetime(dt):
-    tz = pytz.timezone('America/Sao_Paulo')
+    tz = pytz.timezone("America/Sao_Paulo")
     now = datetime.datetime.now(tz)
     dt_brtz = dt.astimezone(tz)
     timedelta = dt_brtz - now
@@ -58,14 +67,13 @@ def get_next_sixth_hours(num_hours=24):
 
     return pd.DataFrame({"Datetime": next_sixth_hours})
 
+
 def copy_log(task_name, log_path, timestamp):
     if os.path.exists(log_path):
-        if not os.path.exists(f"./static/logs/{task_name}"):
-            os.makedirs(f"./static/logs/{task_name}")
         if not os.path.exists(f"./logs/{task_name}"):
             os.makedirs(f"./logs/{task_name}")
         shutil.copy(log_path, f"./logs/{task_name}/{timestamp}.log")
-        shutil.copy(log_path, f"./static/logs/{task_name}/{timestamp}.log")
+
 
 def format_execution_time(start, end):
     seconds = (end - start).total_seconds()
@@ -77,36 +85,53 @@ def format_execution_time(start, end):
     else:
         return f"{round(seconds // 3600, 2)}h {round((seconds % 3600) // 60, 2)}m {round(seconds % 60, 2)}s"
 
+
 def add_execution_history(task_name, task_type, status, start_time, end_time, log_path):
-    execution_history.insert_one({
-        "name": task_name,
-        "task_type": task_type,
-        "status": status,
-        "start_time": start_time.isoformat(),
-        "end_time": end_time.isoformat(),
-        "runtime": format_execution_time(start_time, end_time),
-        "log_path": log_path
-    })
+    execution_history.insert_one(
+        {
+            "name": task_name,
+            "task_type": task_type,
+            "status": status,
+            "start_time": start_time.isoformat(),
+            "end_time": end_time.isoformat(),
+            "runtime": format_execution_time(start_time, end_time),
+            "log_path": log_path,
+        }
+    )
+
 
 def run_dependent_task(task_name, execution_status):
     task_info = time_trigger.find_one({"name": task_name})
     dependents = task_info["dependents"]
     for dependent in dependents:
-        dependent_info = dependecy_trygger.find_one({"name": dependent, "parent": task_name})
-        if dependent_info["trigger_type"] == execution_status or dependent_info["trigger_type"] == "Either":
-            print(dependent)
+        dependent_info = dependecy_trygger.find_one(
+            {"name": dependent, "parent": task_name}
+        )
+        if dependent_info["trigger_type"] in [execution_status, "Either"]:
+
             project_info = project.find_one({"name": dependent})
             if project_info["status"] != "dependency" or not project_info["status"]:
                 return
             venv_python = project_info["python_path"]
             args = [venv_python, project_info["exec_path"]]
-            start_time = datetime.datetime.now(tz=pytz.timezone('America/Sao_Paulo'))
-            execution = subprocess.run(args)  
-            end_time = datetime.datetime.now(tz=pytz.timezone('America/Sao_Paulo'))
-            copy_log(dependent, project_info["log_path"], start_time.strftime('%Y-%m-%d_%H-%M-%S'))
+            logger.info(f"Running dependent task {dependent}")
+            start_time = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
+            execution = subprocess.run(args)
+            end_time = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
+            copy_log(
+                dependent,
+                project_info["log_path"],
+                start_time.strftime("%Y-%m-%d_%H-%M-%S"),
+            )
             execution_returncode = "Success" if execution.returncode == 0 else "Failed"
-            add_execution_history(dependent, "time", execution_returncode, start_time, end_time, f"./logs/{dependent}/{start_time.strftime('%Y-%m-%d_%H-%M-%S')}.log")
-
+            add_execution_history(
+                dependent,
+                "time",
+                execution_returncode,
+                start_time,
+                end_time,
+                f"./logs/{dependent}/{start_time.strftime('%Y-%m-%d_%H-%M-%S')}.log",
+            )
 
 
 def run_task(task_name):
@@ -115,13 +140,23 @@ def run_task(task_name):
         return
     venv_python = project_info["python_path"]
     args = [venv_python, project_info["exec_path"]]
-    start_time = datetime.datetime.now(tz=pytz.timezone('America/Sao_Paulo'))
-    execution = subprocess.run(args)  
-    end_time = datetime.datetime.now(tz=pytz.timezone('America/Sao_Paulo'))
-    copy_log(task_name, project_info["log_path"], start_time.strftime('%Y-%m-%d_%H-%M-%S'))
+    start_time = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
+    execution = subprocess.run(args)
+    end_time = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
+    copy_log(
+        task_name, project_info["log_path"], start_time.strftime("%Y-%m-%d_%H-%M-%S")
+    )
     execution_returncode = "Success" if execution.returncode == 0 else "Failed"
-    add_execution_history(task_name, "time", execution_returncode, start_time, end_time, f"./logs/{task_name}/{start_time.strftime('%Y-%m-%d_%H-%M-%S')}.log")
+    add_execution_history(
+        task_name,
+        "time",
+        execution_returncode,
+        start_time,
+        end_time,
+        f"./logs/{task_name}/{start_time.strftime('%Y-%m-%d_%H-%M-%S')}.log",
+    )
     run_dependent_task(task_name, execution_returncode)
+
 
 def get_exec_table():
     tasks = list(time_trigger.find({}))
@@ -190,17 +225,16 @@ def get_exec_table():
     return task_table_list
 
 
-
-
 while True:
     task_table_list = get_exec_table()
+    logger.info(f"Task table list:\n{task_table_list}")
     for task_table in task_table_list:
         sleep_time = seconds_between_now_and_datetime(task_table.loc[0, "Time"])
-        print(f"Sleeping for {sleep_time} seconds")
+        logger.info(f"Sleeping for {sleep_time} seconds")
         time.sleep(sleep_time)
         threds = []
         for task in task_table["Name"]:
-            print(f"Running task {task}")
+            logger.info(f"Running task {task}")
             if task != "DB_Request":
                 thread = threading.Thread(target=run_task, args=(task,))
                 thread.start()

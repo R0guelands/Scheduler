@@ -97,6 +97,9 @@
                                         Name
                                     </th>
                                     <th scope="col" class="px-6 py-3">
+                                        URL
+                                    </th>
+                                    <th scope="col" class="px-6 py-3">
                                         Created At
                                     </th>
                                 </tr>
@@ -108,6 +111,9 @@
                                             class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
                                             {{http.name}}
                                         </th>
+                                        <td class="px-6 py-4">
+                                            /triggers/{{http.name}}
+                                        </td>
                                         <td class="px-6 py-4">
                                             {{http.created_at}}
                                         </td>

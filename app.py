@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, request, jsonify
+from flask import Flask, render_template, redirect, request, jsonify, send_from_directory, Response
 import helper
 import json
 
@@ -70,4 +70,26 @@ def addDependencyTrigger(config):
     child, parent, trigger_type = config.split("_")
     return redirect("/") if helper.add_dependency_trigger(child, parent, trigger_type) else "Error"
 
-app.run(debug=True)
+@app.route('/history/view/<id>', methods=['GET'])
+def get_log(id):
+    log_path = helper.get_execution_history_by_project(id)["log_path"]
+    
+    with open(log_path, 'r') as f:
+        content = f.read()
+
+    return Response(content, mimetype='text/plain')
+
+@app.route('/history/download/<id>', methods=['GET'])
+def download_log(id):
+    log_path = helper.get_execution_history_by_project(id)["log_path"]
+    log_path = log_path[7:]
+    return send_from_directory("logs", log_path)
+
+@app.route("/triggers/<project_name>")
+def http_trigger(project_name):
+    if helper.run_project(project_name, request.args):
+        return "Success"
+    else:
+        return "Error"
+
+app.run(host="0.0.0.0", port=5000, debug=False)

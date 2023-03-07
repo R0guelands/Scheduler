@@ -2,9 +2,11 @@ import os
 from pymongo import MongoClient
 from dotenv import load_dotenv
 import pandas as pd
-import datetime as dt
+import datetime
 import pytz
 import json
+import subprocess
+import shutil
 
 load_dotenv()
 
@@ -62,7 +64,7 @@ def check_valids_on_db(projects_local):
                     "exec_path": f"./projects/{name}/main.py",
                     "log_path": f"./projects/{name}/out.log",
                     "python_path": f"./projects/{name}/.venv/bin/python",
-                    "created_at": f"{dt.datetime.now(tz=pytz.timezone('America/Sao_Paulo')).strftime('%Y-%m-%d %H:%M:%S')}",
+                    "created_at": f"{datetime.datetime.now(tz=pytz.timezone('America/Sao_Paulo')).strftime('%Y-%m-%d %H:%M:%S')}",
                 }
             )
 
@@ -96,6 +98,12 @@ def get_time_triggers():
 
 def get_project(project_name):
     return project.find_one({"name": project_name})
+
+from bson.objectid import ObjectId
+
+def get_execution_history_by_project(id):
+    print(id)
+    return execution_history.find_one({"_id": ObjectId(id)})
 
 
 def get_dependency_triggers():
@@ -158,7 +166,7 @@ def add_http_trigger(project_name):
             http_trigger.insert_one(
                 {
                     "name": project_name,
-                    "created_at": f"{dt.datetime.now(tz=pytz.timezone('America/Sao_Paulo')).strftime('%Y-%m-%d %H:%M:%S')}",
+                    "created_at": f"{datetime.datetime.now(tz=pytz.timezone('America/Sao_Paulo')).strftime('%Y-%m-%d %H:%M:%S')}",
                     "dependents": [],
                 }
             )
@@ -176,7 +184,7 @@ def add_time_trigger(project_name, config):
             time_trigger.insert_one(
                 {
                     "name": project_name,
-                    "created_at": f"{dt.datetime.now(tz=pytz.timezone('America/Sao_Paulo')).strftime('%Y-%m-%d %H:%M:%S')}",
+                    "created_at": f"{datetime.datetime.now(tz=pytz.timezone('America/Sao_Paulo')).strftime('%Y-%m-%d %H:%M:%S')}",
                     "dependents": [],
                     "config": json.loads(config),
                 }
@@ -194,7 +202,7 @@ def add_dependency_trigger(child, parent, trigger_type):
                 "name": child,
                 "parent": parent,
                 "trigger_type": trigger_type,
-                "created_at": f"{dt.datetime.now(tz=pytz.timezone('America/Sao_Paulo')).strftime('%Y-%m-%d %H:%M:%S')}",
+                "created_at": f"{datetime.datetime.now(tz=pytz.timezone('America/Sao_Paulo')).strftime('%Y-%m-%d %H:%M:%S')}",
                 "dependents": [],
             }
         )
@@ -206,3 +214,88 @@ def add_dependency_trigger(child, parent, trigger_type):
         return True
     except:
         return False
+    
+def copy_log(task_name, log_path, timestamp):
+    if os.path.exists(log_path):
+        if not os.path.exists(f"./logs/{task_name}"):
+            os.makedirs(f"./logs/{task_name}")
+        shutil.copy(log_path, f"./logs/{task_name}/{timestamp}.log")
+
+def format_execution_time(start, end):
+    seconds = (end - start).total_seconds()
+
+    if seconds < 60:
+        return f"{round(seconds, 2)}s"
+    elif seconds < 3600:
+        return f"{round(seconds // 60, 2)}m {round(seconds % 60, 2)}s"
+    else:
+        return f"{round(seconds // 3600, 2)}h {round((seconds % 3600) // 60, 2)}m {round(seconds % 60, 2)}s"
+
+
+def add_execution_history(task_name, task_type, status, start_time, end_time, log_path):
+    execution_history.insert_one(
+        {
+            "name": task_name,
+            "task_type": task_type,
+            "status": status,
+            "start_time": start_time.isoformat(),
+            "end_time": end_time.isoformat(),
+            "runtime": format_execution_time(start_time, end_time),
+            "log_path": log_path,
+        }
+    )
+
+def run_dependent_task(task_name, execution_status, http_args):
+    task_info = http_trigger.find_one({"name": task_name})
+    dependents = task_info["dependents"]
+    for dependent in dependents:
+        dependent_info = dependecy_trygger.find_one(
+            {"name": dependent, "parent": task_name}
+        )
+        if dependent_info["trigger_type"] in [execution_status, "Either"]:
+            print(dependent)
+            project_info = project.find_one({"name": dependent})
+            if project_info["status"] != "dependency" or not project_info["status"]:
+                return
+            venv_python = project_info["python_path"]
+            args = [venv_python, project_info["exec_path"], *http_args]
+            start_time = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
+            execution = subprocess.run(args)
+            end_time = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
+            copy_log(
+                dependent,
+                project_info["log_path"],
+                start_time.strftime("%Y-%m-%d_%H-%M-%S"),
+            )
+            execution_returncode = "Success" if execution.returncode == 0 else "Failed"
+            add_execution_history(
+                dependent,
+                "dependency",
+                execution_returncode,
+                start_time,
+                end_time,
+                f"./logs/{dependent}/{start_time.strftime('%Y-%m-%d_%H-%M-%S')}.log",
+            )
+    
+def run_project(task_name, http_args):
+    if project_info := get_project(task_name):
+        venv_python = project_info["python_path"]
+        http_args = [f"{key}={value}" for key, value in dict(http_args).items()]
+        args = [venv_python, project_info["exec_path"], *http_args]
+        start_time = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
+        execution = subprocess.run(args)
+        end_time = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
+        copy_log(
+            task_name, project_info["log_path"], start_time.strftime("%Y-%m-%d_%H-%M-%S")
+        )
+        execution_returncode = "Success" if execution.returncode == 0 else "Failed"
+        add_execution_history(
+            task_name,
+            "http",
+            execution_returncode,
+            start_time,
+            end_time,
+            f"./logs/{task_name}/{start_time.strftime('%Y-%m-%d_%H-%M-%S')}.log",
+        )
+        run_dependent_task(task_name, execution_returncode, http_args)
+        return True
