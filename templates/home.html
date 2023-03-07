@@ -128,7 +128,10 @@
                                         Created At
                                     </th>
                                     <th scope="col" class="px-6 py-3">
-                                        Config
+                                        Type
+                                    </th>
+                                    <th scope="col" class="px-6 py-3">
+                                        Hours
                                     </th>
                                 </tr>
                             </thead>
@@ -143,7 +146,38 @@
                                             {{time.created_at}}
                                         </td>
                                         <td class="px-6 py-4">
-                                            {{time.config}}
+                                            {% if 'daily' in time.config %}
+                                                Daily
+                                            {% elif 'weekly' in time.config %}
+                                                Weekly
+                                            {% else %}
+                                                Monthly
+                                            {% endif %}
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            {% if 'daily' in time.config %}
+                                            [
+                                            {% for day in time.config.daily %}
+                                                {{day}}
+                                            {% endfor %}
+                                            ]
+                                            {% elif 'weekly' in time.config %}
+                                                {% for day in time.config.weekly %}
+                                                    {{day}}=[
+                                                    {% for hour in time.config.weekly[day] %}
+                                                        {{hour}}
+                                                    {% endfor %}
+                                                    ] <br>
+                                                {% endfor %}
+                                            {% else %}
+                                                {% for day in time.config.monthly %}
+                                                    {{day}}=[
+                                                    {% for hour in time.config.monthly[day] %}
+                                                        {{hour}}
+                                                    {% endfor %}
+                                                    ] <br>
+                                                {% endfor %}
+                                            {% endif %}
                                         </td>
                                     </tr>
                                 {% endfor %}

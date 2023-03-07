@@ -7,6 +7,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Scheduler</title>
     <link href="{{url_for('static',filename='css/main.css')}}" rel="stylesheet">
+    <script type="text/javascript">
+        function viewTextFile(url) {
+          fetch(url)
+            .then(response => response.text())
+            .then(text => {
+              var newWindow = window.open();
+              newWindow.document.write("<pre>" + text + "</pre>");
+            })
+            .catch(error => console.error(error));
+        }
+      </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" crossorigin="anonymous" />
 
 </head>
 
@@ -54,7 +66,7 @@
                                     <th scope="col" class="px-6 py-3">
                                         Runtime
                                     </th>
-                                    <th scope="col" class="px-6 py-3">
+                                    <th scope="col" colspan="2" class="px-6 py-3">
                                         Log
                                     </th>
                                 </tr>
@@ -85,13 +97,21 @@
                                             {% endif %}
                                         </td>
                                         <td class="px-6 py-4">
-                                            {{history.start_time}}
+                                            {{history.start_time[:4]}}-{{history.start_time[5:7]}}-{{history.start_time[8:10]}} {{history.start_time[11:13]}}:{{history.start_time[14:16]}}
                                         </td>
                                         <td class="px-6 py-4">
                                             {{history.runtime}}
                                         </td>
                                         <td class="px-6 py-4">
-                                            {{history.log_path}}
+                                            <a href="{{url_for('static',filename=history.log_path)}}" class="font-medium text-blue-600 dark:text-blue-500 hover:underline" download="log.txt">
+                                                Download
+                                            </a>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <a href="#" onclick="viewTextFile('{{url_for('static',filename=history.log_path)}}')" class="font-medium text-blue-600 dark:text-blue-500 hover:underline flex items-center">
+                                                <span class="mr-2">View</span>
+                                                <i class="fas fa-arrow-right"></i>
+                                            </a>
                                         </td>
                                     </tr>
                                 {% endfor %}
