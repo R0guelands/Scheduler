@@ -12,7 +12,7 @@ import shutil
 import sys
 
 
-def ConfigLog(timezone="America/Sao_Paulo", name=__name__, log_path=""):
+def ConfigLog(log_path, timezone="America/Sao_Paulo", name=__name__):
     import datetime
     import pytz
     import logging
@@ -31,10 +31,8 @@ def ConfigLog(timezone="America/Sao_Paulo", name=__name__, log_path=""):
 
     logging.Formatter.converter = timetz
 
-    parent_folder = os.getcwd() if log_path == "" else log_path
-
     logging.basicConfig(
-        filename=f"{parent_folder}/out.log",
+        filename=log_path,
         filemode="w" if name == "__main__" else "a",
         format="[%(asctime)s] %(levelname)s [%(name)s]: %(message)s",
         datefmt="%d/%b/%Y %H:%M:%S",
@@ -47,9 +45,7 @@ def ConfigLog(timezone="America/Sao_Paulo", name=__name__, log_path=""):
     sys.excepthook = except_handler
 
     return logger
-
-
-logger = ConfigLog(log_path="/home/r0guelands/Apps/Scheduler/logs/time_scheduler")
+logger = ConfigLog(log_path="/home/r0guelands/Apps/Scheduler/logs/time_scheduler/out.log")
 
 load_dotenv()
 
@@ -269,7 +265,7 @@ while True:
     task_table_list = get_exec_table()
     print_df = pd.DataFrame(columns=["Name", "Time"])
     for task_table in task_table_list:
-        print_df = pd.concat([print_df, task_table])
+        print_df = pd.concat([print_df, task_table], ignore_index=True)
     logger.info(f"Tasks to be executed:\n{print_df}")
     for task_table in task_table_list:
         sleep_time = seconds_between_now_and_datetime(task_table.loc[0, "Time"])
