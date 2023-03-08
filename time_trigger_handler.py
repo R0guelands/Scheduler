@@ -9,26 +9,47 @@ import math
 import threading
 import subprocess
 import shutil
-import logging
 import sys
 
-if not os.path.exists("./logs/time_scheduler"):
-    os.makedirs("./logs/time_scheduler")
 
-def except_handler(type, value, tb):
-    logger.exception("Exception: {0}".format(str(value)))
+def ConfigLog(timezone="America/Sao_Paulo", name=__name__, log_path=""):
+    import datetime
+    import pytz
+    import logging
+    import os
 
-def timetz(*args):
-    return datetime.datetime.now(tz).timetuple()
+    if log_path != "" and not os.path.exists(log_path):
+        os.makedirs(log_path)
 
-tz = pytz.timezone('America/Sao_Paulo')
+    tz = pytz.timezone(timezone)
 
-logging.Formatter.converter = timetz
+    def except_handler(type, value, tb):
+        logger.exception("Exception: {0}".format(str(value)))
 
-logging.basicConfig(filename="./logs/time_scheduler/out.log", format="[%(asctime)s] %(levelname)s [%(name)s]: %(message)s", datefmt="%d/%b/%Y %H:%M:%S",)
-logger = logging.getLogger("Time Scheduler")
-logger.setLevel(logging.INFO)
-sys.excepthook = except_handler
+    def timetz(*args):
+        return datetime.datetime.now(tz).timetuple()
+
+    logging.Formatter.converter = timetz
+
+    parent_folder = os.getcwd() if log_path == "" else log_path
+
+    logging.basicConfig(
+        filename=f"{parent_folder}/out.log",
+        filemode="w" if name == "__main__" else "a",
+        format="[%(asctime)s] %(levelname)s [%(name)s]: %(message)s",
+        datefmt="%d/%b/%Y %H:%M:%S",
+    )
+
+    logger = logging.getLogger(name)
+
+    logger.setLevel(logging.INFO)
+
+    sys.excepthook = except_handler
+
+    return logger
+
+
+logger = ConfigLog(log_path="/home/r0guelands/Apps/Scheduler/logs/time_scheduler")
 
 load_dotenv()
 
@@ -100,43 +121,12 @@ def add_execution_history(task_name, task_type, status, start_time, end_time, lo
     )
 
 
-def run_dependent_task(task_name, execution_status):
-    task_info = time_trigger.find_one({"name": task_name})
-    dependents = task_info["dependents"]
-    for dependent in dependents:
-        dependent_info = dependecy_trygger.find_one(
-            {"name": dependent, "parent": task_name}
-        )
-        if dependent_info["trigger_type"] in [execution_status, "Either"]:
-
-            project_info = project.find_one({"name": dependent})
-            if project_info["status"] != "dependency" or not project_info["status"]:
-                return
-            venv_python = project_info["python_path"]
-            args = [venv_python, project_info["exec_path"]]
-            logger.info(f"Running dependent task {dependent}")
-            start_time = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
-            execution = subprocess.run(args)
-            end_time = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
-            copy_log(
-                dependent,
-                project_info["log_path"],
-                start_time.strftime("%Y-%m-%d_%H-%M-%S"),
-            )
-            execution_returncode = "Success" if execution.returncode == 0 else "Failed"
-            add_execution_history(
-                dependent,
-                "time",
-                execution_returncode,
-                start_time,
-                end_time,
-                f"./logs/{dependent}/{start_time.strftime('%Y-%m-%d_%H-%M-%S')}.log",
-            )
-
-
 def run_task(task_name):
     project_info = project.find_one({"name": task_name})
-    if project_info["status"] != "time" or not project_info["status"]:
+    if (
+        project_info["status"] not in ["time", "dependency"]
+        or not project_info["status"]
+    ):
         return
     venv_python = project_info["python_path"]
     args = [venv_python, project_info["exec_path"]]
@@ -155,7 +145,108 @@ def run_task(task_name):
         end_time,
         f"./logs/{task_name}/{start_time.strftime('%Y-%m-%d_%H-%M-%S')}.log",
     )
-    run_dependent_task(task_name, execution_returncode)
+    return execution_returncode
+
+
+def run_dep_task(task_name, execution_status):
+    task_info = time_trigger.find_one({"name": task_name})
+    dependents = task_info["dependents"]
+    for dependent in dependents:
+        dependent_info = dependecy_trygger.find_one(
+            {"name": dependent, "parent": task_name}
+        )
+        if dependent_info["trigger_type"] in [execution_status, "Either"]:
+            logger.info(f"Running dependent task {dependent}")
+            run_task(dependent)
+
+
+def orchestrate_task(task_name):
+    execution_returncode = run_task(task_name)
+    run_dep_task(task_name, execution_returncode)
+
+
+def if_daily(task, task_table, max_time_table):
+    if len(task["config"]["daily"]) == 0:
+        task["config"]["daily"] = ["00:01"]
+    now = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
+    for hour in task["config"]["daily"]:
+        if hour == "00:00":
+            hour = "00:01"
+        hour = datetime.datetime.strptime(hour, "%H:%M")
+        hour = hour.replace(
+            year=now.year,
+            month=now.month,
+            day=now.day,
+            second=0,
+            microsecond=0,
+            tzinfo=now.tzinfo,
+        )
+        if hour >= now and hour <= max_time_table.loc[0, "Datetime"]:
+            task_table.loc[len(task_table)] = [task["name"], hour]
+    return task_table
+
+
+def if_weekly(task, task_table, max_time_table):
+    if len(task["config"]["weekly"]) == 0:
+        task["config"]["weekly"] = {"0": ["00:01"]}
+    now = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
+    for day, hours in task["config"]["weekly"].items():
+        if not hours:
+            task["config"]["weekly"][day] = ["00:01"]
+        for hour in hours:
+            if hour == "00:00":
+                hour = "00:01"
+            hour = datetime.datetime.strptime(hour, "%H:%M")
+            hour = hour.replace(
+                year=now.year,
+                month=now.month,
+                day=now.day,
+                second=0,
+                microsecond=0,
+                tzinfo=now.tzinfo,
+            )
+            if int(day) == now.weekday() and (
+                hour >= now and hour <= max_time_table.loc[0, "Datetime"]
+            ):
+                task_table.loc[len(task_table)] = [task["name"], hour]
+    return task_table
+
+
+def if_monthly(task, task_table, max_time_table):
+    if len(task["config"]["monthly"]) == 0:
+        task["config"]["monthly"] = {"1": ["00:01"]}
+    now = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
+    for day, hours in task["config"]["monthly"].items():
+        if not hours:
+            task["config"]["monthly"][day] = ["00:01"]
+        for hour in hours:
+            if hour == "00:00":
+                hour = "00:01"
+            hour = datetime.datetime.strptime(hour, "%H:%M")
+            hour = hour.replace(
+                year=now.year,
+                month=now.month,
+                day=now.day,
+                second=0,
+                microsecond=0,
+                tzinfo=now.tzinfo,
+            )
+            if int(day) == now.day and (
+                hour >= now and hour <= max_time_table.loc[0, "Datetime"]
+            ):
+                task_table.loc[len(task_table)] = [task["name"], hour]
+    return task_table
+
+
+def organize_tasks(task_table):
+    groups = task_table.groupby("Time").filter(lambda x: len(x) > 1).groupby("Time")
+    task_table_list = [group.reset_index(drop=True) for _, group in groups]
+    unique_times = task_table.groupby("Time").filter(lambda x: len(x) == 1)
+    task_table_list.extend(
+        [unique_times.loc[[i]].reset_index(drop=True) for i in unique_times.index]
+    )
+    task_table_list.sort(key=lambda x: x["Time"].iloc[0])
+    return task_table_list
 
 
 def get_exec_table():
@@ -165,69 +256,21 @@ def get_exec_table():
     task_table.loc[0] = ["DB_Request", max_time_table.loc[0, "Datetime"]]
     for task in tasks:
         if "daily" in task["config"]:
-            if len(task["config"]["daily"]) == 0:
-                task["config"]["daily"] = ["00:01"]
-            for hour in task["config"]["daily"]:
-                if hour == "00:00":
-                    hour = "00:01"
-                hour = datetime.datetime.strptime(hour, "%H:%M")
-                now = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
-                hour_ = now.replace(
-                    hour=hour.hour, minute=hour.minute, second=0, microsecond=0
-                )
-                if hour_ >= now and hour_ <= max_time_table.loc[0, "Datetime"]:
-                    task_table.loc[len(task_table)] = [task["name"], hour_]
-
+            task_table = if_daily(task, task_table, max_time_table)
         if "weekly" in task["config"]:
-            if len(task["config"]["weekly"]) == 0:
-                task["config"]["weekly"] = {"0": ["00:01"]}
-            for day in task["config"]["weekly"]:
-                if len(task["config"]["weekly"][day]) == 0:
-                    task["config"]["weekly"][day] = ["00:01"]
-                for hour in task["config"]["weekly"][day]:
-                    if hour == "00:00":
-                        hour = "00:01"
-                    now = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
-                    if int(day) == now.weekday():
-                        hour = datetime.datetime.strptime(hour, "%H:%M")
-                        hour_ = now.replace(
-                            hour=hour.hour, minute=hour.minute, second=0, microsecond=0
-                        )
-                        if hour_ >= now and hour_ <= max_time_table.loc[0, "Datetime"]:
-                            task_table.loc[len(task_table)] = [task["name"], hour_]
-
+            task_table = if_weekly(task, task_table, max_time_table)
         if "monthly" in task["config"]:
-            if len(task["config"]["monthly"]) == 0:
-                task["config"]["monthly"] = {"1": ["00:01"]}
-            for day in task["config"]["monthly"]:
-                if len(task["config"]["monthly"][day]) == 0:
-                    task["config"]["monthly"][day] = ["00:01"]
-                for hour in task["config"]["monthly"][day]:
-                    if hour == "00:00":
-                        hour = "00:01"
-                    now = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
-                    if int(day) == now.day:
-                        hour = datetime.datetime.strptime(hour, "%H:%M")
-                        hour_ = now.replace(
-                            hour=hour.hour, minute=hour.minute, second=0, microsecond=0
-                        )
-                        if hour_ >= now and hour_ <= max_time_table.loc[0, "Datetime"]:
-                            task_table.loc[len(task_table)] = [task["name"], hour_]
+            task_table = if_monthly(task, task_table, max_time_table)
 
-    groups = task_table.groupby("Time").filter(lambda x: len(x) > 1).groupby("Time")
-    task_table_list = [group.reset_index(drop=True) for _, group in groups]
-    unique_times = task_table.groupby("Time").filter(lambda x: len(x) == 1)
-    task_table_list.extend(
-        [unique_times.loc[[i]].reset_index(drop=True) for i in unique_times.index]
-    )
-    task_table_list.sort(key=lambda x: x["Time"].iloc[0])
-
-    return task_table_list
+    return organize_tasks(task_table)
 
 
 while True:
     task_table_list = get_exec_table()
-    logger.info(f"Task table list:\n{task_table_list}")
+    print_df = pd.DataFrame(columns=["Name", "Time"])
+    for task_table in task_table_list:
+        print_df = pd.concat([print_df, task_table])
+    logger.info(f"Tasks to be executed:\n{print_df}")
     for task_table in task_table_list:
         sleep_time = seconds_between_now_and_datetime(task_table.loc[0, "Time"])
         logger.info(f"Sleeping for {sleep_time} seconds")
@@ -236,7 +279,7 @@ while True:
         for task in task_table["Name"]:
             logger.info(f"Running task {task}")
             if task != "DB_Request":
-                thread = threading.Thread(target=run_task, args=(task,))
+                thread = threading.Thread(target=orchestrate_task, args=(task,))
                 thread.start()
                 threds.append(thread)
         for thread in threds:

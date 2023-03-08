@@ -74,7 +74,15 @@ def check_valids_on_db(projects_local):
             delete_trigger("http", name)
             delete_trigger("time", name)
             delete_trigger("dependency", name)
+            delete_logs(name)
 
+def delete_logs(project_name):
+    if os.path.exists(f"./logs/{project_name}"):
+        for file in os.listdir(f"./logs/{project_name}"):
+            if file.endswith(".log"):
+                os.remove(f"./logs/{project_name}/{file}")
+        os.removedirs(f"./logs/{project_name}")
+        execution_history.delete_many({"name": project_name})
 
 def scan_projects():
     folders = os.listdir("./projects")
