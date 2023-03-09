@@ -87,9 +87,10 @@ def download_log(id):
 
 @app.route("/triggers/<project_name>")
 def http_trigger(project_name):
-    if helper.run_project(project_name, request.args):
-        return "Success"
-    else:
-        return "Error"
+    import threading
+    threading.Thread(
+        target=helper.run_project, args=(project_name, request.args)
+    ).start()
+    return "Success"
 
 app.run(host="0.0.0.0", port=5000, debug=False)
