@@ -6,7 +6,9 @@ def ConfigLog(log_path, timezone="America/Sao_Paulo", name=__name__):
     import sys
 
     if log_path != "" and not os.path.exists(log_path):
-        os.makedirs(log_path)
+       #makes the .log file
+        with open(log_path, "w") as f:
+            pass
 
     tz = pytz.timezone(timezone)
 
@@ -32,5 +34,3 @@ def ConfigLog(log_path, timezone="America/Sao_Paulo", name=__name__):
     sys.excepthook = except_handler
 
     return logger
-
-logger = ConfigLog(log_path="projects/b/out.log")
