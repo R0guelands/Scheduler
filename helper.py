@@ -82,7 +82,10 @@ def delete_logs(project_name):
             if file.endswith(".log"):
                 os.remove(f"./logs/{project_name}/{file}")
         os.removedirs(f"./logs/{project_name}")
+    try:
         execution_history.delete_many({"name": project_name})
+    except:
+        pass
 
 def scan_projects():
     folders = os.listdir("./projects")

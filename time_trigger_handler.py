@@ -9,7 +9,6 @@ import math
 import threading
 import subprocess
 import shutil
-import sys
 
 
 def ConfigLog(log_path, timezone="America/Sao_Paulo", name=__name__):
@@ -17,6 +16,7 @@ def ConfigLog(log_path, timezone="America/Sao_Paulo", name=__name__):
     import pytz
     import logging
     import os
+    import sys
 
     if log_path != "" and not os.path.exists(log_path):
         os.makedirs(log_path)
@@ -45,7 +45,11 @@ def ConfigLog(log_path, timezone="America/Sao_Paulo", name=__name__):
     sys.excepthook = except_handler
 
     return logger
-logger = ConfigLog(log_path="/home/r0guelands/Apps/Scheduler/logs/time_scheduler/out.log")
+
+
+logger = ConfigLog(
+    log_path="/home/r0guelands/Apps/Scheduler/logs/time_scheduler/out.log"
+)
 
 load_dotenv()
 
@@ -117,8 +121,11 @@ def add_execution_history(task_name, task_type, status, start_time, end_time, lo
     )
 
 
-def run_task(task_name):
+def run_task(task_name, type_):
     project_info = project.find_one({"name": task_name})
+    if not project_info:
+        logger.info(f"Task [{task_name}] not found. Skipping...")
+        return
     if (
         project_info["status"] not in ["time", "dependency"]
         or not project_info["status"]
@@ -135,7 +142,7 @@ def run_task(task_name):
     execution_returncode = "Success" if execution.returncode == 0 else "Failed"
     add_execution_history(
         task_name,
-        "time",
+        type_,
         execution_returncode,
         start_time,
         end_time,
@@ -146,18 +153,23 @@ def run_task(task_name):
 
 def run_dep_task(task_name, execution_status):
     task_info = time_trigger.find_one({"name": task_name})
+    if not task_info:
+        logger.info(f"Task [{task_name}] not found for dependency check. Skipping...")
+        return
     dependents = task_info["dependents"]
+    if not dependents:
+        return
     for dependent in dependents:
         dependent_info = dependecy_trygger.find_one(
             {"name": dependent, "parent": task_name}
         )
         if dependent_info["trigger_type"] in [execution_status, "Either"]:
             logger.info(f"Running dependent task {dependent}")
-            run_task(dependent)
+            run_task(dependent, "dependency")
 
 
 def orchestrate_task(task_name):
-    execution_returncode = run_task(task_name)
+    execution_returncode = run_task(task_name, "time")
     run_dep_task(task_name, execution_returncode)
 
 
