@@ -256,7 +256,7 @@ def add_execution_history(task_name, task_type, status, start_time, end_time, lo
         }
     )
 
-def run_dependent_task(task_name, execution_status, http_args):
+def run_dependent_task(task_name, execution_status, json_args):
     task_info = http_trigger.find_one({"name": task_name})
     dependents = task_info["dependents"]
     for dependent in dependents:
@@ -264,12 +264,11 @@ def run_dependent_task(task_name, execution_status, http_args):
             {"name": dependent, "parent": task_name}
         )
         if dependent_info["trigger_type"] in [execution_status, "Either"]:
-            print(dependent)
             project_info = project.find_one({"name": dependent})
             if project_info["status"] != "dependency" or not project_info["status"]:
                 return
             venv_python = project_info["python_path"]
-            args = [venv_python, project_info["exec_path"], *http_args]
+            args = [venv_python, project_info["exec_path"], *json_args]
             start_time = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
             execution = subprocess.run(args)
             end_time = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
@@ -288,13 +287,13 @@ def run_dependent_task(task_name, execution_status, http_args):
                 f"./logs/{dependent}/{start_time.strftime('%Y-%m-%d_%H-%M-%S')}.log",
             )
     
-def run_project(task_name, http_args):
+def run_project(task_name, json_args):
     if project_info := get_project(task_name):
         venv_python = project_info["python_path"]
-        http_args = [f"{key}={value}" for key, value in dict(http_args).items()]
-        args = [venv_python, project_info["exec_path"], *http_args]
+        json_args = [f"{key}&&&{value}" for key, value in dict(json_args).items()]
+        args = [venv_python, project_info["exec_path"], *json_args]
         start_time = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
-        execution = subprocess.run(args)
+        execution = subprocess.run(args, capture_output=True)
         end_time = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
         copy_log(
             task_name, project_info["log_path"], start_time.strftime("%Y-%m-%d_%H-%M-%S")
@@ -308,5 +307,5 @@ def run_project(task_name, http_args):
             end_time,
             f"./logs/{task_name}/{start_time.strftime('%Y-%m-%d_%H-%M-%S')}.log",
         )
-        run_dependent_task(task_name, execution_returncode, http_args)
-        return True
+        run_dependent_task(task_name, execution_returncode, json_args)
+        return execution

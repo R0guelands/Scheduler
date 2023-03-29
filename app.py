@@ -85,12 +85,22 @@ def download_log(id):
     log_path = log_path[7:]
     return send_from_directory("logs", log_path)
 
-@app.route("/triggers/<project_name>")
+@app.route("/triggers/<project_name>", methods=["POST"])
 def http_trigger(project_name):
-    import threading
-    threading.Thread(
-        target=helper.run_project, args=(project_name, request.args)
-    ).start()
-    return "Success"
+    project_name = project_name.replace("\t", "")
+    names = [project["name"] for project in helper.get_http_triggers()]
+    if project_name not in names:
+        return jsonify("Bad project name"), 400
+    body = request.get_json()
+    if "headless" in request.args:
+        import threading
+        threading.Thread(
+            target=helper.run_project, args=(project_name, body)
+        ).start()
+        return jsonify("Success. Headless mode"), 200
+    execution = helper.run_project(project_name, body)
+    if "split" in request.args:
+        return jsonify(execution.stdout.decode("utf-8").split("\n")), 200
+    return jsonify(execution.stdout.decode("utf-8")), 200
 
 app.run(host="0.0.0.0", port=5000, debug=False)
