@@ -268,7 +268,7 @@ def run_dependent_task(task_name, execution_status, json_args):
             if project_info["status"] != "dependency" or not project_info["status"]:
                 return
             venv_python = project_info["python_path"]
-            args = [venv_python, project_info["exec_path"], *json_args]
+            args = [venv_python, project_info["exec_path"], str(json_args)]
             start_time = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
             execution = subprocess.run(args)
             end_time = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
@@ -290,8 +290,7 @@ def run_dependent_task(task_name, execution_status, json_args):
 def run_project(task_name, json_args):
     if project_info := get_project(task_name):
         venv_python = project_info["python_path"]
-        json_args = [f"{key}&&&{value}" for key, value in dict(json_args).items()]
-        args = [venv_python, project_info["exec_path"], *json_args]
+        args = [venv_python, project_info["exec_path"], str(json_args)]
         start_time = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
         execution = subprocess.run(args, capture_output=True)
         end_time = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
