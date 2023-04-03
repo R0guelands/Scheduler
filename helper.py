@@ -292,7 +292,7 @@ def run_project(task_name, json_args):
         venv_python = project_info["python_path"]
         args = [venv_python, project_info["exec_path"], str(json_args)]
         start_time = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
-        execution = subprocess.run(args, capture_output=True)
+        execution = subprocess.run(args)
         end_time = datetime.datetime.now(tz=pytz.timezone("America/Sao_Paulo"))
         copy_log(
             task_name, project_info["log_path"], start_time.strftime("%Y-%m-%d_%H-%M-%S")

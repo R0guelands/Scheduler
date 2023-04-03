@@ -99,8 +99,6 @@ def http_trigger(project_name):
         ).start()
         return jsonify("Success. Headless mode"), 200
     execution = helper.run_project(project_name, body)
-    if "split" in request.args:
-        return jsonify(execution.stdout.decode("utf-8").split("\n")), 200
-    return jsonify(execution.stdout.decode("utf-8")), 200
+    return jsonify("Success"), 200 if execution.returncode == 0 else jsonify("Error"), 400
 
 app.run(host="0.0.0.0", port=5000, debug=False)
